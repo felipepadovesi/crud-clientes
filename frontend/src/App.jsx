@@ -1,122 +1,156 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useEffect, useState } from 'react';
+import { requisicao } from './api';
+import './App.css';
 
-function App() {
-  const [count, setCount] = useState(0)
+const vazio = { nome: '', email: '', telefone: '' };
+
+export default function App() {
+  const [clientes, setClientes] = useState([]);
+  const [form, setForm] = useState(vazio);
+  const [idEdicao, setIdEdicao] = useState(null);
+  const [mensagem, setMensagem] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+
+  useEffect(() => {
+    let ativo = true;
+    requisicao()
+      .then(retorno => {
+        if (ativo) setClientes(retorno.dados);
+      })
+      .catch(erro => {
+        if (ativo) setMensagem(erro.message);
+      });
+    return () => { ativo = false; };
+  }, []);
+
+  async function carregarClientes() {
+    const retorno = await requisicao();
+    setClientes(retorno.dados);
+  }
+
+  function alterarCampo(evento) {
+    const { name, value } = evento.target;
+    setForm({ ...form, [name]: value });
+  }
+
+  function limpar() {
+    setForm(vazio);
+    setIdEdicao(null);
+  }
+
+  function editar(cliente) {
+    setForm({ nome: cliente.nome, email: cliente.email,
+    telefone: cliente.telefone });
+    setIdEdicao(cliente.id);
+    setMensagem('Edite os campos e salve as alterações.');
+  }
+
+  async function salvar(evento) {
+    evento.preventDefault();
+    setOcupado(true);
+
+    try {
+      const caminho = idEdicao === null ? '' : `/${idEdicao}`;
+
+      await requisicao(caminho, {
+        method: idEdicao === null ? 'POST' : 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      });
+
+      limpar();
+      await carregarClientes();
+      setMensagem('Cliente salvo com sucesso.');
+    } catch (erro) {
+      setMensagem(erro.message);
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function excluir(id) {
+    if (!window.confirm('Deseja excluir este cliente?')) return;
+    setOcupado(true);
+    try {
+      await requisicao(`/${id}`, { method: 'DELETE' });
+      if (idEdicao === id) limpar();
+      await carregarClientes();
+      setMensagem('Cliente excluído.');
+    } catch (erro) {
+      setMensagem(erro.message);
+    } finally {
+      setOcupado(false);
+    }
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <main>
 
-      <div className="ticks"></div>
+      <h1>Cadastro de clientes</h1>
+      
+      <form onSubmit={salvar}>
+        <fieldset disabled={ocupado}>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+          <legend>{idEdicao === null ? 'Novo cliente' :
+        'Editar cliente'}</legend>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+          <label>Nome
+            <input name="nome" value={form.nome}
+            onChange={alterarCampo} maxLength={100} required />
+          </label>
+
+          <label>E-mail
+            <input name="email" type="email" value={form.email}
+            onChange={alterarCampo} maxLength={150} required />
+          </label>
+
+          <label>Telefone
+            <input name="telefone" type="tel"
+            value={form.telefone} onChange={alterarCampo}
+            maxLength={20} required />
+          </label>
+
+          <div className="acoes">
+            <button type="submit">
+              {ocupado ? 'Aguarde...' : idEdicao === null ?
+              'Cadastrar' : 'Salvar alterações'}
+            </button>
+
+            {idEdicao !== null && <button type="button"
+            onClick={limpar}>Cancelar</button>}
+          </div>
+        </fieldset>
+      </form>
+      <p role="status">{mensagem}</p>
+
+      <h2>Clientes cadastrados</h2>
+      <div className="tabela">
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Nome</th><th>E-mail</th>
+            <th>Telefone</th><th>Ações</th>
+          </tr></thead>
+          <tbody>
+            {clientes.length === 0 && <tr>
+              <td colSpan={5}>Nenhum cliente cadastrado.</td>
+            </tr>}
+
+            {clientes.map(cliente => <tr key={cliente.id}>
+              <td>{cliente.id}</td><td>{cliente.nome}</td>
+              <td>{cliente.email}</td><td>{cliente.telefone}</td>
+              <td>
+                <button disabled={ocupado} type="button"
+                onClick={() => editar(cliente)}>Editar</button>
+
+                <button disabled={ocupado} type="button"
+                onClick={() => excluir(cliente.id)}>Excluir</button>
+              </td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
+    </main>
+  );
 }
 
-export default App
+
